@@ -13,6 +13,12 @@
  */
 #include "hashtable.h"
 
+#include <errno.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+
 /* multi-thread support
 #include <fcntl.h>
 #include <errno.h>
@@ -45,7 +51,7 @@ static item** primary_hashtable = 0;
 static item** old_hashtable = 0;
 
 /* Number of items in the hash table. */
-static unsigned int hash_items = 0;
+static S_UINT hash_items = 0;
 
 /* Flag: Are we in the middle of expanding now? */
 static bool expanding = false;
@@ -65,16 +71,15 @@ void hashtable_init(const int ht_init) {
     if (! primary_hashtable) {
         fprintf(stderr, "Failed to init hashtable.\n");
         exit(EXIT_FAILURE);
-    }
-    /*
-    STATS_LOCK();
+    }        
+    
+    //STATS_LOCK();
     stats.hash_power_level = hashpower;
     stats.hash_bytes = hashsize(hashpower) * sizeof(void *);
-    STATS_UNLOCK();
-    */
+    //STATS_UNLOCK();    
 }
 
-item *hashtable_find(const char *key, const size_t nkey, const uint32_t hv) {
+item *hashtable_find(const S_CHAR *key, const S_UINT nkey, const S_UINT32 hv) {
     item *it;
     unsigned int oldbucket;
 
@@ -89,7 +94,7 @@ item *hashtable_find(const char *key, const size_t nkey, const uint32_t hv) {
     item *ret = NULL;
     int depth = 0;
     while (it) {
-        if ((nkey == it->nkey) && (memcmp(key, ITEM_key(it), nkey) == 0)) {
+        if ((nkey == it->nkey) && (memcmp(key, it->key, nkey) == 0)) {
             ret = it;
             break;
         }
@@ -115,7 +120,7 @@ static item** _hashitem_before (const char *key, const size_t nkey, const uint32
         pos = &primary_hashtable[hv & hashmask(hashpower)];
     }
 
-    while (*pos && ((nkey != (*pos)->nkey) || memcmp(key, ITEM_key(*pos), nkey))) {
+    while (*pos && ((nkey != (*pos)->nkey) || memcmp(key, (*pos)->key, nkey))) {
         pos = &(*pos)->h_next;
     }
     return pos;
@@ -130,28 +135,31 @@ static void hashtable_expand(void) {
         hashpower++;
         expanding = true;
         expand_bucket = 0;
-        /*
-        STATS_LOCK();
+        
+        //STATS_LOCK();
         stats.hash_power_level = hashpower;
         stats.hash_bytes += hashsize(hashpower) * sizeof(void *);
         stats.hash_is_expanding = 1;
-        STATS_UNLOCK();
-        */
+        //STATS_UNLOCK();
+        
     } else {
         primary_hashtable = old_hashtable;
         /* Bad news, but we can keep running. */
     }
 }
 
+/*
+  another thread to extend the hashtable
+ */
 static void hashtable_start_expand(void) {
     if (started_expanding)
         return;
     started_expanding = true;
-    pthread_cond_signal(&maintenance_cond);
+    //pthread_cond_signal(&maintenance_cond);
 }
 
 /* Note: this isn't an assoc_update.  The key must not already exist to call this */
-int hashtable_insert(item *it, const uint32_t hv) {
+int hashtable_insert(item *it, const S_UINT32 hv) {
     unsigned int oldbucket;
 
 //    assert(assoc_find(ITEM_key(it), it->nkey) == 0);  /* shouldn't have duplicately named things defined */
@@ -175,7 +183,7 @@ int hashtable_insert(item *it, const uint32_t hv) {
     return 1;
 }
 
-void hashtable_delete(const char *key, const size_t nkey, const uint32_t hv) {
+void hashtable_delete(const S_CHAR *key, const S_UINT nkey, const S_UINT32 hv) {
     item **before = _hashitem_before(key, nkey, hv);
 
     if (*before) {

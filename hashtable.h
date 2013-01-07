@@ -1,30 +1,33 @@
 #ifndef HASHTABLE
 #define HASHTABLE
 
-#define HASHPOWER_DEFAULT 16
-
 #include <stddef.h>
 #include <stdint.h>
 #include "main.h"
+#include "win.h"
 
 typedef struct node item, *pitem;
 
 void hashtable_init(const int hashpower_init);
-item *hashtable_find(const char *key, const size_t nkey, const uint32_t hv);
-int hashtable_insert(item *item, const uint32_t hv);
-void hashtable_delete(const char *key, const size_t nkey, const uint32_t hv);
+item *hashtable_find(const S_CHAR *key, const S_UINT nkey, const S_UINT32 hv);
+int hashtable_insert(item *item, const S_UINT32 hv);
+void hashtable_delete(const S_CHAR *key, const S_UINT nkey, const S_UINT32 hv);
 void do_hashtable_move_next_bucket(void);
 int start_hashtable_maintenance_thread(void);
 void stop_hashtable_maintenance_thread(void);
 //extern unsigned int hashpower;
 
 
-
+/*
+  TODO
+  this only can deal with single char but wide char,
+  i think I will extent the function to wide char later with template
+ */
 struct node {
-    char* key;
-    uint32_t nkey;
-    char* value;
-    uint32_t nvalue;
+    S_CHAR * key;
+    S_INT nkey;
+    S_CHAR* value;
+    S_UINT32 nvalue;
     struct node* h_next;
 };
 
