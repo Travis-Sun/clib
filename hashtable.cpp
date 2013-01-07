@@ -176,7 +176,8 @@ int hashtable_insert(item *it, const S_UINT32 hv) {
 
     hash_items++;
     if (! expanding && hash_items > (hashsize(hashpower) * 3) / 2) {
-        hashtable_start_expand();
+        hashtable_expand();
+        //hashtable_start_expand();
     }
 
     //MEMCACHED_ASSOC_INSERT(ITEM_key(it), it->nkey, hash_items);
