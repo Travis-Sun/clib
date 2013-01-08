@@ -25,7 +25,7 @@ void stop_hashtable_maintenance_thread(void);
  */
 struct node {
     S_CHAR * key;
-    S_INT nkey;
+    S_UINT nkey;
     S_CHAR* value;
     S_UINT32 nvalue;
     struct node* h_next;

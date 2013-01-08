@@ -12,6 +12,7 @@
  * The rest of the file is licensed under the BSD license.  See LICENSE.
  */
 #include "hashtable.h"
+#include "hash.h"
 
 #include <errno.h>
 #include <stdlib.h>
@@ -67,15 +68,15 @@ void hashtable_init(const int ht_init) {
     if (ht_init) {
         hashpower = ht_init;
     }
-    primary_hashtable = calloc(hashsize(hashpower), sizeof(void *));
+    primary_hashtable = (item**)calloc(hashsize(hashpower), sizeof(void *));
     if (! primary_hashtable) {
         fprintf(stderr, "Failed to init hashtable.\n");
         exit(EXIT_FAILURE);
     }        
     
     //STATS_LOCK();
-    stats.hash_power_level = hashpower;
-    stats.hash_bytes = hashsize(hashpower) * sizeof(void *);
+    //stats.hash_power_level = hashpower;
+    //stats.hash_bytes = hashsize(hashpower) * sizeof(void *);
     //STATS_UNLOCK();    
 }
 
@@ -130,16 +131,16 @@ static item** _hashitem_before (const char *key, const size_t nkey, const uint32
 static void hashtable_expand(void) {
     old_hashtable = primary_hashtable;
 
-    primary_hashtable = calloc(hashsize(hashpower + 1), sizeof(void *));
+    primary_hashtable = (item**)calloc(hashsize(hashpower + 1), sizeof(void *));
     if (primary_hashtable) {        
         hashpower++;
         expanding = true;
         expand_bucket = 0;
         
         //STATS_LOCK();
-        stats.hash_power_level = hashpower;
-        stats.hash_bytes += hashsize(hashpower) * sizeof(void *);
-        stats.hash_is_expanding = 1;
+        /* stats.hash_power_level = hashpower; */
+        /* stats.hash_bytes += hashsize(hashpower) * sizeof(void *); */
+        /* stats.hash_is_expanding = 1; */
         //STATS_UNLOCK();
         
     } else {
@@ -210,6 +211,33 @@ static volatile int do_run_maintenance_thread = 1;
 #define DEFAULT_HASH_BULK_MOVE 1
 int hash_bulk_move = DEFAULT_HASH_BULK_MOVE;
 
+static void hashtable_expand_move() {
+    int ii;
+    for (ii = 0; ii < hash_bulk_move && expanding; ++ii) {
+        item *it, *next;
+        int bucket;
+
+        for (it = old_hashtable[expand_bucket]; NULL != it; it = next) {
+            next = it->h_next;
+
+            bucket = hash(it->key, it->nkey, 0) & hashmask(hashpower);
+            it->h_next = primary_hashtable[bucket];
+            primary_hashtable[bucket] = it;
+        }
+        
+        old_hashtable[expand_bucket] = NULL;
+
+        expand_bucket++;
+        if (expand_bucket == hashsize(hashpower - 1)) {
+            expanding = false;
+            free(old_hashtable);            
+            fprintf(stderr, "Hash table expansion done\n");
+        }
+    }    
+}
+    
+
+
 static void *hashtable_maintenance_thread(void *arg) {
 
     while (do_run_maintenance_thread) {
@@ -217,8 +245,8 @@ static void *hashtable_maintenance_thread(void *arg) {
 
         /* Lock the cache, and bulk move multiple buckets to the new
          * hash table. */
-        item_lock_global();
-        mutex_lock(&cache_lock);
+        //item_lock_global();
+        //mutex_lock(&cache_lock);
 
         for (ii = 0; ii < hash_bulk_move && expanding; ++ii) {
             item *it, *next;
@@ -227,7 +255,7 @@ static void *hashtable_maintenance_thread(void *arg) {
             for (it = old_hashtable[expand_bucket]; NULL != it; it = next) {
                 next = it->h_next;
 
-                bucket = hash(ITEM_key(it), it->nkey, 0) & hashmask(hashpower);
+                bucket = hash(it->key, it->nkey, 0) & hashmask(hashpower);
                 it->h_next = primary_hashtable[bucket];
                 primary_hashtable[bucket] = it;
             }
@@ -249,8 +277,8 @@ static void *hashtable_maintenance_thread(void *arg) {
             }
         }
 
-        mutex_unlock(&cache_lock);
-        item_unlock_global();
+        //mutex_unlock(&cache_lock);
+        //item_unlock_global();
 
         // TODO        
         if (!expanding) {
@@ -258,48 +286,48 @@ static void *hashtable_maintenance_thread(void *arg) {
             //switch_item_lock_type(ITEM_LOCK_GRANULAR);
             //slabs_rebalancer_resume();
             /* We are done expanding.. just wait for next invocation */
-            mutex_lock(&cache_lock);
-            started_expanding = false;
-            pthread_cond_wait(&maintenance_cond, &cache_lock);
+            //mutex_lock(&cache_lock);
+            //started_expanding = false;
+            //pthread_cond_wait(&maintenance_cond, &cache_lock);
             /* Before doing anything, tell threads to use a global lock */
-            mutex_unlock(&cache_lock);
-            slabs_rebalancer_pause();
-            switch_item_lock_type(ITEM_LOCK_GLOBAL);
-            mutex_lock(&cache_lock);
-            hashtable_expand();
-            mutex_unlock(&cache_lock);
+            /* mutex_unlock(&cache_lock); */
+            /* slabs_rebalancer_pause(); */
+            /* switch_item_lock_type(ITEM_LOCK_GLOBAL); */
+            /* mutex_lock(&cache_lock); */
+            /* hashtable_expand(); */
+            /* mutex_unlock(&cache_lock); */
         }
     }
     return NULL;
 }
 
-static pthread_t maintenance_tid;
+//static pthread_t maintenance_tid;
 
 int start_hashtable_maintenance_thread() {
-    int ret;
-    char *env = getenv("MEMCACHED_HASH_BULK_MOVE");
-    if (env != NULL) {
-        hash_bulk_move = atoi(env);
-        if (hash_bulk_move == 0) {
-            hash_bulk_move = DEFAULT_HASH_BULK_MOVE;
-        }
-    }
-    if ((ret = pthread_create(&maintenance_tid, NULL,
-                              assoc_maintenance_thread, NULL)) != 0) {
-        fprintf(stderr, "Can't create thread: %s\n", strerror(ret));
-        return -1;
-    }
+    /* int ret; */
+    /* char *env = getenv("MEMCACHED_HASH_BULK_MOVE"); */
+    /* if (env != NULL) { */
+    /*     hash_bulk_move = atoi(env); */
+    /*     if (hash_bulk_move == 0) { */
+    /*         hash_bulk_move = DEFAULT_HASH_BULK_MOVE; */
+    /*     } */
+    /* } */
+    /* if ((ret = pthread_create(&maintenance_tid, NULL, */
+    /*                           assoc_maintenance_thread, NULL)) != 0) { */
+    /*     fprintf(stderr, "Can't create thread: %s\n", strerror(ret)); */
+    /*     return -1; */
+    /* } */
     return 0;
 }
 
 void stop_hashtable_maintenance_thread() {
-    mutex_lock(&cache_lock);
-    do_run_maintenance_thread = 0;
-    pthread_cond_signal(&maintenance_cond);
-    mutex_unlock(&cache_lock);
+    /* mutex_lock(&cache_lock); */
+    /* do_run_maintenance_thread = 0; */
+    /* pthread_cond_signal(&maintenance_cond); */
+    /* mutex_unlock(&cache_lock); */
 
     /* Wait for the maintenance thread to stop */
-    pthread_join(maintenance_tid, NULL);
+    //pthread_join(maintenance_tid, NULL);
 }
 
 

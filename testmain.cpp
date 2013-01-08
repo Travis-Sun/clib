@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "times33hash.h"
+#include "hashtable.h"
 #include <iostream>
 #include "win.h"
 #include <locale.h>
@@ -31,5 +32,16 @@ int main(void)
     fwprintf(fh, L"key=%s, the hash value is %d\n", key2, Times33Hash::hash(key2, wcslen(key2)));
     
     fclose(fh);
+
+    hashtable_init(0);
+    item it;
+    
+    int i = hashtable_insert(key, strlen(key), 4381);
+    if (i!=1) {
+        wprintf("insert key=%s fail", key);
+        return 1;
+    }
+    
+    
     return 0;
 }
